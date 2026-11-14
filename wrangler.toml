@@ -9,7 +9,3 @@ zone_name = "promedia.report"
 [[routes]]
 pattern = "promedia.report/sitemap.xml"
 zone_name = "promedia.report"
-
-[[routes]]
-pattern = "www.promedia.report/*"
-zone_name = "promedia.report"

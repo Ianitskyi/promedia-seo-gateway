@@ -14,27 +14,33 @@
 2. **Journalism2026, promedia-communities, promedia-jobs, promedia-research,
    promedia-atlas** — у будь-якому порядку після news. Якщо злити їх раніше,
    аналітика на цих сайтах не працюватиме, доки news не опублікує модуль.
-3. **promedia-seo-gateway** — редирект www (розділ 2).
+3. **promedia-seo-gateway** — змін у коді Worker немає (див. розділ 2).
 
 Відкат: скасувати (revert) PR у відповідному репозиторії. Модуль у news можна
 лишити: без підключення на сторінці він нічого не робить.
 
 ## 2. Редирект www.promedia.report → promedia.report
 
-1. Cloudflare → зона `promedia.report` → DNS: має існувати **проксований**
-   (помаранчева хмара) запис для `www`, наприклад `CNAME www → promedia.report`.
-2. `npx wrangler deploy` у репозиторії `promedia-seo-gateway`.
-3. Перевірка:
-   `curl -sI https://www.promedia.report/projects?x=1` → `301`,
-   `location: https://promedia.report/projects?x=1`.
+**Уже працює (аудит 14.11.2026), нічого робити не треба.**
 
-Альтернатива без Worker: Rules → Redirect Rules → шаблон «Redirect from WWW to
-root». Тоді маршрут `www.promedia.report/*` з `wrangler.toml` треба прибрати.
+- DNS: `CNAME www → promedia.report`, проксований.
+- Маршрут `www.promedia.report/*` належить Worker **`promedia-main`** (головний
+  сайт), і саме він віддає `301` зі збереженням шляху й query.
+- Перевірка: `curl -sI "https://www.promedia.report/projects?x=1"` → `301`,
+  `location: https://promedia.report/projects?x=1`.
+
+Маршрут для `www` у `promedia-seo-gateway` **не додавати**: один шаблон маршруту
+не може належати двом Worker-ам, і `wrangler deploy` або впаде з помилкою, або
+забере `www` у головного сайту.
 
 ## 3. WAF-правило проти ботів із дата-центрів
 
 Мета: прибрати з GA відвідування з дата-центрів (Урумчі, Санья, Ешберн,
 Каунсіл-Блафс) і не зачепити пошукових та ШІ-ботів.
+
+**Стан (аудит 14.11.2026):** правило вже створене 14.11.2026 з дією
+Managed Challenge і обмеженням `http.host eq "ratings.promedia.report"`
+(тариф зони Free, дії Log немає). Тиждень спостереження — до 21.11.2026.
 
 **Крок 1. Тиждень у режимі «Log».** Security → WAF → Custom rules → Create:
 
@@ -73,10 +79,21 @@ Security → Events, відфільтруйте за правилом і пер�
   GPTBot, ClaudeBot, PerplexityBot і більшість сервісів прев'ю посилань.
 - Правило діє лише на HTML-сторінки (GET + `Accept: text/html`), тому не ламає
   API, `fetch()` і завантаження даних.
-- Правило працює лише для **проксованих** записів зони. Сайти на GitHub Pages
-  (ratings, communities, research, jobs) мають бути з помаранчевою хмарою.
-  Atlas підключено через Cloudflare for SaaS (`custom-domains.chatgpt.site`):
-  перевірте, чи запис проксований, інакше правило його не охопить.
+- Правило працює лише для **проксованих** записів зони. Стан на 14.11.2026:
+
+  | Хост | Де розміщений | Проксований (WAF діє) |
+  | --- | --- | --- |
+  | promedia.report, www | Worker `promedia-main` | так |
+  | news, projects | Worker `promedia-news` | так |
+  | atlas | Worker `promedia-atlas` (маршрут `atlas.promedia.report/*`) | так |
+  | ratings | GitHub Pages | так |
+  | communities, jobs, research, brief | GitHub Pages | ні |
+  | santa, money | ChatGPT Sites (`custom-domains.chatgpt.site`) | ні |
+  | events | Vercel | ні |
+  | labs | запису DNS немає | — |
+
+  Перемикати GitHub Pages на помаранчеву хмару — лише після перевірки
+  SSL/TLS-режиму зони (має бути Full), інакше можливі проблеми з HTTPS.
 - **Bot Fight Mode не вмикайте:** його не можна обійти WAF-правилами (Skip),
   тож хибні спрацювання на живих людях чи потрібних ботах буде нічим виправити.
 
