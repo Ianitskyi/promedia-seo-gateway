@@ -78,6 +78,13 @@ export default {
   async fetch(request) {
     const url = new URL(request.url);
 
+    // www.promedia.report -> promedia.report (301), keeping path and query.
+    if (url.hostname === "www.promedia.report") {
+      url.hostname = "promedia.report";
+      url.protocol = "https:";
+      return Response.redirect(url.toString(), 301);
+    }
+
     if (url.pathname === "/robots.txt") {
       return new Response(`User-agent: *
 Allow: /
